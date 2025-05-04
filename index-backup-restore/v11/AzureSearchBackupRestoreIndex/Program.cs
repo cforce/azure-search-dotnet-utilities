@@ -41,7 +41,9 @@ class Program
         //Set up source and target search service clients
         ConfigurationSetup();
 
-        bool hasSourceConfig = !string.IsNullOrEmpty(SourceSearchServiceName) && !string.IsNullOrEmpty(SourceIndexName);
+        bool hasSourceService = !string.IsNullOrEmpty(SourceSearchServiceName);
+        bool hasSourceIndex = !string.IsNullOrEmpty(SourceIndexName);
+        bool hasSourceConfig = hasSourceService && hasSourceIndex;
         bool hasTargetConfig = !string.IsNullOrEmpty(TargetSearchServiceName) && !string.IsNullOrEmpty(TargetIndexName);
         bool hasBackupFiles = Directory.Exists(BackupDirectory) && Directory.GetFiles(BackupDirectory, "*.json").Length > 0;
 
@@ -108,7 +110,13 @@ class Program
 
         // Print configuration based on what's available
         Console.WriteLine("CONFIGURATION:");
-        if (!string.IsNullOrEmpty(SourceSearchServiceName) && !string.IsNullOrEmpty(SourceIndexName))
+        Console.WriteLine($"SourceSearchServiceName: '{SourceSearchServiceName}'");
+        Console.WriteLine($"SourceIndexName: '{SourceIndexName}'");
+        
+        bool hasSourceService = !string.IsNullOrEmpty(SourceSearchServiceName);
+        bool hasSourceIndex = !string.IsNullOrEmpty(SourceIndexName);
+        
+        if (hasSourceService && hasSourceIndex)
         {
             Console.WriteLine("\n  Source service and index: {0}, {1}", SourceSearchServiceName, SourceIndexName);
         }
@@ -121,21 +129,37 @@ class Program
         Console.ReadLine();
 
         // Only create source clients if source configuration is available
-        if (!string.IsNullOrEmpty(SourceSearchServiceName) && !string.IsNullOrEmpty(SourceAdminKey) && !string.IsNullOrEmpty(SourceIndexName))
+        if (hasSourceService && hasSourceIndex && !string.IsNullOrEmpty(SourceAdminKey))
         {
-            SourceIndexClient = new SearchIndexClient(
-                new Uri("https://" + SourceSearchServiceName + ".search.windows.net"), 
-                new AzureKeyCredential(SourceAdminKey));
-            SourceSearchClient = SourceIndexClient.GetSearchClient(SourceIndexName);
+            try
+            {
+                SourceIndexClient = new SearchIndexClient(
+                    new Uri("https://" + SourceSearchServiceName + ".search.windows.net"), 
+                    new AzureKeyCredential(SourceAdminKey));
+                SourceSearchClient = SourceIndexClient.GetSearchClient(SourceIndexName);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error creating source clients: {0}", ex.Message);
+                throw;
+            }
         }
 
         // Only create target clients if target configuration is available
         if (!string.IsNullOrEmpty(TargetSearchServiceName) && !string.IsNullOrEmpty(TargetAdminKey) && !string.IsNullOrEmpty(TargetIndexName))
         {
-            TargetIndexClient = new SearchIndexClient(
-                new Uri("https://" + TargetSearchServiceName + ".search.windows.net"), 
-                new AzureKeyCredential(TargetAdminKey));
-            TargetSearchClient = TargetIndexClient.GetSearchClient(TargetIndexName);
+            try
+            {
+                TargetIndexClient = new SearchIndexClient(
+                    new Uri("https://" + TargetSearchServiceName + ".search.windows.net"), 
+                    new AzureKeyCredential(TargetAdminKey));
+                TargetSearchClient = TargetIndexClient.GetSearchClient(TargetIndexName);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error creating target clients: {0}", ex.Message);
+                throw;
+            }
         }
     }
 
