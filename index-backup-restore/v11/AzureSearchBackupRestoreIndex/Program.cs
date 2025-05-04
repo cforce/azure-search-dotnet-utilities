@@ -206,7 +206,6 @@ class Program
     static void ExportToJSON(int Skip, string FileName)
     {
         // Extract all the documents from the selected index to JSON files in batches of 500 docs / file
-        string json = string.Empty;
         try
         {
             SearchOptions options = new SearchOptions()
@@ -217,23 +216,44 @@ class Program
             };
 
             SearchResults<SearchDocument> response = SourceSearchClient.Search<SearchDocument>("*", options);
+            var documents = response.GetResults().ToList();
 
-            foreach (var doc in response.GetResults())
+            if (documents.Count == 0)
             {
-                json += JsonSerializer.Serialize(doc.Document) + ",";
-                json = json.Replace("\"Latitude\":", "\"type\": \"Point\", \"coordinates\": [");
-                json = json.Replace("\"Longitude\":", "");
-                json = json.Replace(",\"IsEmpty\":false,\"Z\":null,\"M\":null,\"CoordinateSystem\":{\"EpsgId\":4326,\"Id\":\"4326\",\"Name\":\"WGS84\"}", "]");
-                json += "\n";
+                Console.WriteLine("  No documents found in this batch");
+                return;
             }
 
-            // Output the formatted content to a file
-            json = json.Substring(0, json.Length - 3); // remove trailing comma
-            File.WriteAllText(FileName, "{\"value\": [");
-            File.AppendAllText(FileName, json);
-            File.AppendAllText(FileName, "]}");
-            Console.WriteLine("  Total documents: {0}", response.GetResults().Count().ToString());
-            json = string.Empty;
+            // Create a list to hold all document JSON strings
+            var jsonDocuments = new List<string>();
+
+            foreach (var doc in documents)
+            {
+                string docJson = JsonSerializer.Serialize(doc.Document);
+                // Handle GeoPoint fields if they exist
+                docJson = docJson.Replace("\"Latitude\":", "\"type\": \"Point\", \"coordinates\": [");
+                docJson = docJson.Replace("\"Longitude\":", "");
+                docJson = docJson.Replace(",\"IsEmpty\":false,\"Z\":null,\"M\":null,\"CoordinateSystem\":{\"EpsgId\":4326,\"Id\":\"4326\",\"Name\":\"WGS84\"}", "]");
+                jsonDocuments.Add(docJson);
+            }
+
+            // Create the final JSON structure
+            string finalJson = "{\"value\": [" + string.Join(",", jsonDocuments) + "]}";
+
+            // Validate the JSON before writing
+            try
+            {
+                JsonDocument.Parse(finalJson);
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine($"  Error: Generated invalid JSON: {ex.Message}");
+                return;
+            }
+
+            // Write the validated JSON to file
+            File.WriteAllText(FileName, finalJson);
+            Console.WriteLine("  Total documents: {0}", documents.Count);
         }
         catch (Exception ex)
         {
@@ -383,7 +403,7 @@ class Program
 
         try
         {
-            foreach (string fileName in Directory.GetFiles(BackupDirectory, "*.json"))
+            foreach (string fileName in Directory.GetFiles(BackupDirectory, SourceIndexName + "*.json"))
             {
                 Console.WriteLine("  -Uploading documents from file {0}", fileName);
                 string json = File.ReadAllText(fileName);
