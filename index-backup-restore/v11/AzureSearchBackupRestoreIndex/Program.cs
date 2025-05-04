@@ -315,7 +315,18 @@ class Program
         // Use the schema file to create a copy of this index
         // I like using REST here since I can just take the response as-is
 
-        string json = File.ReadAllText(Path.Combine(BackupDirectory, SourceIndexName + ".schema"));
+        // Find any .schema file in the backup directory
+        var schemaFiles = Directory.GetFiles(BackupDirectory, "*.schema");
+        if (schemaFiles.Length == 0)
+        {
+            throw new FileNotFoundException($"No schema file found in {BackupDirectory}. Please ensure a .schema file exists.");
+        }
+        if (schemaFiles.Length > 1)
+        {
+            throw new InvalidOperationException($"Multiple schema files found in {BackupDirectory}. Please ensure only one .schema file exists.");
+        }
+
+        string json = File.ReadAllText(schemaFiles[0]);
 
         // Do some cleaning of this file to change index name, etc
         json = "{" + json.Substring(json.IndexOf("\"name\""));
@@ -336,6 +347,7 @@ class Program
         catch (Exception ex)
         {
             Console.WriteLine("  Error: {0}", ex.Message);
+            throw;
         }
     }
 
