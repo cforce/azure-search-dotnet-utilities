@@ -41,25 +41,52 @@ class Program
         //Set up source and target search service clients
         ConfigurationSetup();
 
-        //Backup the source index
-        Console.WriteLine("\nSTART INDEX BACKUP");
-        BackupIndexAndDocuments();
+        bool hasSourceConfig = !string.IsNullOrEmpty(SourceSearchServiceName) && !string.IsNullOrEmpty(SourceIndexName);
+        bool hasTargetConfig = !string.IsNullOrEmpty(TargetSearchServiceName) && !string.IsNullOrEmpty(TargetIndexName);
+        bool hasBackupFiles = Directory.Exists(BackupDirectory) && Directory.GetFiles(BackupDirectory, "*.json").Length > 0;
 
-        //Recreate and import content to target index
-        Console.WriteLine("\nSTART INDEX RESTORE");
-        DeleteIndex();
-        CreateTargetIndex();
-        ImportFromJSON();
-        Console.WriteLine("\n  Waiting 10 seconds for target to index content...");
-        Console.WriteLine("  NOTE: For really large indexes it may take longer to index all content.\n");
-        Thread.Sleep(10000);
+        if (hasSourceConfig)
+        {
+            // Mode 1: Backup/Export source index
+            Console.WriteLine("\nSTART INDEX BACKUP");
+            BackupIndexAndDocuments();
+        }
 
-        // Validate all content is in target index
-        int sourceCount = GetCurrentDocCount(SourceSearchClient);
-        int targetCount = GetCurrentDocCount(TargetSearchClient);
-        Console.WriteLine("\nSAFEGUARD CHECK: Source and target index counts should match");
-        Console.WriteLine(" Source index contains {0} docs", sourceCount);
-        Console.WriteLine(" Target index contains {0} docs\n", targetCount);
+        if (hasTargetConfig)
+        {
+            if (hasSourceConfig)
+            {
+                // Mode 1: Full backup and restore
+                Console.WriteLine("\nSTART INDEX RESTORE");
+                DeleteIndex();
+                CreateTargetIndex();
+                ImportFromJSON();
+            }
+            else if (hasBackupFiles)
+            {
+                // Mode 3: Only restore from existing backup
+                Console.WriteLine("\nSTART INDEX RESTORE FROM EXISTING BACKUP");
+                DeleteIndex();
+                CreateTargetIndex();
+                ImportFromJSON();
+            }
+            else
+            {
+                Console.WriteLine("\nERROR: Cannot restore - no backup files found in {0}", BackupDirectory);
+                return;
+            }
+
+            Console.WriteLine("\n  Waiting 10 seconds for target to index content...");
+            Console.WriteLine("  NOTE: For really large indexes it may take longer to index all content.\n");
+            Thread.Sleep(10000);
+
+            // Validate all content is in target index
+            int sourceCount = GetCurrentDocCount(SourceSearchClient);
+            int targetCount = GetCurrentDocCount(TargetSearchClient);
+            Console.WriteLine("\nSAFEGUARD CHECK: Source and target index counts should match");
+            Console.WriteLine(" Source index contains {0} docs", sourceCount);
+            Console.WriteLine(" Target index contains {0} docs\n", targetCount);
+        }
 
         Console.WriteLine("Press any key to continue...");
         Console.ReadLine();
