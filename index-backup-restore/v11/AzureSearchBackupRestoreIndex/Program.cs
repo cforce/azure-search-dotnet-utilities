@@ -383,18 +383,43 @@ class Program
 
         try
         {
-            foreach (string fileName in Directory.GetFiles(BackupDirectory, SourceIndexName + "*.json"))
+            foreach (string fileName in Directory.GetFiles(BackupDirectory, "*.json"))
             {
                 Console.WriteLine("  -Uploading documents from file {0}", fileName);
                 string json = File.ReadAllText(fileName);
+                
+                // Validate JSON structure
+                try
+                {
+                    var jsonDoc = JsonDocument.Parse(json);
+                    if (!jsonDoc.RootElement.TryGetProperty("value", out _))
+                    {
+                        Console.WriteLine($"  Error: JSON file {fileName} does not contain a 'value' array");
+                        continue;
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    Console.WriteLine($"  Error: Invalid JSON in file {fileName}: {ex.Message}");
+                    continue;
+                }
+
                 Uri uri = new Uri(ServiceUri, "/indexes/" + TargetIndexName + "/docs/index");
                 HttpResponseMessage response = AzureSearchHelper.SendSearchRequest(HttpClient, HttpMethod.Post, uri, json);
-                response.EnsureSuccessStatusCode();
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorContent = response.Content.ReadAsStringAsync().Result;
+                    Console.WriteLine($"  Error: Response status code does not indicate success: {(int)response.StatusCode} ({response.StatusCode})");
+                    Console.WriteLine($"  Error details: {errorContent}");
+                    throw new Exception($"Failed to upload documents from {fileName}. Status: {response.StatusCode}");
+                }
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine("  Error: {0}", ex.Message);
+            throw;
         }
     }
 }
