@@ -1,11 +1,11 @@
 #!/bin/sh
 
 # Configuration for backup-only operation
-export SourceSearchServiceName="gptkb-3uckkbqtc3tw4"
-export SourceIndexName="gptkbindex"
-export BackupDirectory="index-backup"
+#export SourceSearchServiceName=""
+#export SourceIndexName=""
 
 # Target configuration should be empty for backup-only mode
+export BackupDirectory="index-backup"
 export TargetSearchServiceName=""
 export TargetIndexName=""
 export TargetAdminKey=""
