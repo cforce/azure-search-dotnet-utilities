@@ -23,35 +23,44 @@ ARG TargetAdminKey
 ARG TargetIndexName
 ARG BackupDirectory=index-backup
 
+# Set environment variables
 ENV SourceSearchServiceName=${SourceSearchServiceName}
 ENV SourceAdminKey=${SourceAdminKey}
+ENV SourceIndexName=${SourceIndexName}
+ENV TargetSearchServiceName=${TargetSearchServiceName}
+ENV TargetAdminKey=${TargetAdminKey}
+ENV TargetIndexName=${TargetIndexName}
+ENV BackupDirectory=${BackupDirectory}
 
-# Patch the appsettings.json using jq
-RUN ls -alh && cat appsettings.json
+# Create a default appsettings.json if it doesn't exist
+RUN echo '{\
+  "SourceSearchServiceName": "",\
+  "SourceAdminKey": "",\
+  "SourceIndexName": "",\
+  "TargetSearchServiceName": "",\
+  "TargetAdminKey": "",\
+  "TargetIndexName": "",\
+  "BackupDirectory": "index-backup"\
+}' > appsettings.json
 
-# Patch appsettings.json using jq with external filter
-RUN echo '\
-  if $sssn != "" then .SourceSearchServiceName = $sssn else . end | \
-  if $sak != "" then .SourceAdminKey = $sak else . end | \
-  if $sin != "" then .SourceIndexName = $sin else . end | \
-  if $tssn != "" then .TargetSearchServiceName = $tssn else . end | \
-  if $tak != "" then .TargetAdminKey = $tak else . end | \
-  if $tin != "" then .TargetIndexName = $tin else . end | \
-  if $bd != "" then .BackupDirectory = $bd else . end' \
-  > /tmp/jq_filter.jq && \
-  jq \
-    --arg sssn "${SourceSearchServiceName}" \
-    --arg sak "${SourceAdminKey}" \
-    --arg sin "${SourceIndexName}" \
-    --arg tssn "${TargetSearchServiceName}" \
-    --arg tak "${TargetAdminKey}" \
-    --arg tin "${TargetIndexName}" \
-    --arg bd "${BackupDirectory}" \
-    -f /tmp/jq_filter.jq \
-    appsettings.json > appsettings.patched.json && \
-  mv appsettings.patched.json appsettings.json && \
-  rm /tmp/jq_filter.jq
-
+# Patch appsettings.json using jq
+RUN jq \
+  --arg sssn "${SourceSearchServiceName}" \
+  --arg sak "${SourceAdminKey}" \
+  --arg sin "${SourceIndexName}" \
+  --arg tssn "${TargetSearchServiceName}" \
+  --arg tak "${TargetAdminKey}" \
+  --arg tin "${TargetIndexName}" \
+  --arg bd "${BackupDirectory}" \
+  'if $sssn != "" then .SourceSearchServiceName = $sssn else . end | \
+   if $sak != "" then .SourceAdminKey = $sak else . end | \
+   if $sin != "" then .SourceIndexName = $sin else . end | \
+   if $tssn != "" then .TargetSearchServiceName = $tssn else . end | \
+   if $tak != "" then .TargetAdminKey = $tak else . end | \
+   if $tin != "" then .TargetIndexName = $tin else . end | \
+   if $bd != "" then .BackupDirectory = $bd else . end' \
+  appsettings.json > appsettings.patched.json && \
+  mv appsettings.patched.json appsettings.json
 
 # Restore, build, and publish
 RUN dotnet restore ../AzureSearchBackupRestoreIndex.sln
